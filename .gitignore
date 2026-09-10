@@ -1,0 +1,97 @@
+# =============================================================================
+# PARTICIPANT DATA — must never be committed
+# -----------------------------------------------------------------------------
+# This repository is public. Anything committed here stays in the git history
+# permanently, even if deleted in a later commit. Raw and derived participant
+# data are excluded by folder and by extension.
+# =============================================================================
+dat_triglycerides_change/
+data/
+dat/
+
+*.xlsx
+*.xls
+*.csv
+*.tsv
+*.sav
+*.dta
+*.rds
+*.rda
+*.RDS
+*.Rda
+/*.R
+
+# =============================================================================
+# R
+# =============================================================================
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+.Renviron
+.Rapp.history
+
+# =============================================================================
+# Quarto
+# -----------------------------------------------------------------------------
+# IMPORTANT: the patterns below are anchored to the repository root with a
+# leading slash. An unanchored pattern such as `*_files/` would also match
+# docs/<page>_files/, which holds the rendered figures — GitHub Pages would then
+# serve the site with every image missing.
+# =============================================================================
+/.quarto/
+/_freeze/
+**/*.quarto_ipynb
+
+# Render intermediates at the project root only
+/*_cache/
+/*_files/
+
+# =============================================================================
+# Rendered site — DO NOT IGNORE
+# -----------------------------------------------------------------------------
+# GitHub Pages serves from docs/, so the whole folder must be committed,
+# including docs/.nojekyll (which stops Jekyll from stripping files and folders
+# whose names begin with an underscore). Quarto writes .nojekyll automatically;
+# confirm it is present and tracked with:  git check-ignore -v docs/.nojekyll
+# =============================================================================
+# (nothing to ignore here — listed for clarity)
+
+# =============================================================================
+# Manuscript working files
+# -----------------------------------------------------------------------------
+# Uncomment if for_paper_codiet3/ holds drafts, figures or correspondence you
+# would rather not publish. Leave commented if it is part of the public record.
+# =============================================================================
+# for_paper_codiet3/
+
+# Word/LaTeX lock and temp files
+~$*.docx
+~$*.xlsx
+*.log
+*.aux
+*.synctex.gz
+
+# =============================================================================
+# Operating system and editors
+# =============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+.vscode/
+*.swp
+*~
+
+# =============================================================================
+# Stray outputs written to the project root by scripts
+# -----------------------------------------------------------------------------
+# ggsave() in the diagnostic scripts writes PNGs to the working directory.
+# Figures belong in the rendered site, not tracked separately.
+# =============================================================================
+/cmdi_tg_*.png
+/*.pdf

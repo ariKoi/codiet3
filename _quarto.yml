@@ -1,0 +1,63 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "Codiet Project"
+  description: "Metabolite biomarkers and clinical prediction for metabolic syndrome"
+  navbar:
+    search: false
+    left:
+      - text: "Metabolite Biomarkers & Clinical Prediction For Metabolic Syndrome"
+        href: index.qmd
+  sidebar:
+    style: floating
+    search: false
+    contents:
+      - section: "Sections"
+        contents:
+          - text: "Index Reconstruction"
+            href: cmdi_tg_correction_diagnostic.qmd
+  page-footer:
+    border: true
+    left: "CODIET · WP2"
+    right: "Built with Quarto"
+
+format:
+  html:
+    theme: [cosmo, custom.scss]
+    page-layout: full
+    toc: true
+    toc-depth: 3
+    toc-title: "Contents"
+    toc-location: right
+    number-sections: true
+    number-depth: 1
+    df-print: paged
+    fig-width: 7
+    fig-height: 5
+    fig-align: center
+    fig-cap-location: bottom
+    tbl-cap-location: top
+    code-copy: true
+    code-overflow: wrap
+    code-line-numbers: false
+    anchor-sections: true
+    smooth-scroll: true
+    link-external-newwindow: true
+
+execute:
+  keep-md: false
+  message: false
+  warning: false
+  echo: false
+  eval: false
+  cache: true
+  dpi: 300
+
+knitr:
+  opts_chunk:
+    comment: NA
+    cache.lazy: false
+
+editor: source

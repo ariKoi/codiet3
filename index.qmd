@@ -1,0 +1,81 @@
+---
+title: "Metabolite Biomarkers and Clinical Prediction for Metabolic Syndrome"
+subtitle: "CODIET · Work Package 2"
+date: now
+editor_options: 
+  chunk_output_type: console
+---
+
+# Overview
+
+This site documents the analytical work behind a study of metabolic syndrome in
+a population-based cohort. The work has two connected parts.
+
+The first is a **Composite Metabolic Desirability Index (CMDI)**: a continuous
+measure of metabolic risk built from body mass index, triglycerides, HDL
+cholesterol and fasting glucose using multi-response optimisation and desirability
+functions. The motivation is that the conventional International Diabetes
+Federation definition reduces a graded biological phenomenon to a yes/no
+classification, which discards information at the thresholds and treats all
+qualifying criteria as interchangeable.
+
+The second is a **clinical prediction model** for that index, fitted with a
+bespoke priority-ordered variable selection procedure (`bootPriorProc`) across a
+set of data domains spanning demographics, dietary indices, physical activity,
+medication, device-based body composition, clinical biochemistry, targeted
+metabolomics, urinary metabolites and untargeted lipidomics.
+
+# Sections
+
+## Index reconstruction
+
+[Reconstructing the CMDI after a triglyceride data correction](cmdi_tg_correction_diagnostic.qmd)
+
+A data-quality problem was identified in the triglyceride measurements after the
+initial analysis was complete. Because triglycerides are one of the four
+components of the CMDI, the correction propagates into the model outcome rather
+than into a single predictor.
+
+This section documents the diagnostics used to decide how the index should be
+constructed before committing to a refit. It compares the original index, the
+index with corrected triglycerides, and a version with fixed clinical bounds;
+examines the consequences of deriving desirability bounds from the observed data
+range; and records the alternative parameterisations that were tested and set
+aside.
+
+# Data
+
+The analysis set comprises repeated observations from participants measured at
+two timepoints. Variables are organised into blocks reflecting how they were
+collected and how readily they are obtained in practice, and this ordering is
+used by the selection procedure so that lower-priority molecular measurements
+have to earn their place against routinely available clinical ones.
+
+| Block | Contents |
+|---|---|
+| `demo` | Demographics |
+| `bp` | Blood pressure sub-index |
+| `activity` | Accelerometry-derived physical activity |
+| `dietary` | Dietary indices |
+| `meds` | Medication use |
+| `human` | Device-based body composition and function |
+| `biochem` | Clinical biochemistry |
+| `aas` | Amino acids and sugars |
+| `acylCar` | Acylcarnitines |
+| `hilic` | Urinary metabolites (HILIC) |
+| `ttp` | Tyrosine–tryptophan pathway metabolites |
+| `lip` | Untargeted lipidomics |
+
+# Software
+
+Analyses are carried out in R. The index is constructed with `desirability2`;
+model fitting and validation use the `rms` package, with bootstrap resampling
+clustered by participant to respect the repeated-measures structure. Missing
+values are imputed by random forest (`miceRanger`). This site is built with
+Quarto.
+
+# Notes
+
+Pages are added as sections of the analysis are completed. Numerical results
+shown here are internal working outputs and should not be treated as final until
+the corresponding model refits have been run and checked.

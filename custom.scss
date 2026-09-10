@@ -1,0 +1,351 @@
+/*-- scss:defaults --*/
+
+// ---------------------------------------------------------------------------
+// Typography
+// System-first stacks so the site renders identically offline. Swap the first
+// entry for a webfont (e.g. "Source Sans 3") if you add a Google Fonts link.
+// ---------------------------------------------------------------------------
+$font-family-sans-serif: "Source Sans 3", "Inter", -apple-system, BlinkMacSystemFont,
+  "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !default;
+$font-family-monospace: "JetBrains Mono", "Source Code Pro", ui-monospace,
+  SFMono-Regular, Menlo, Consolas, monospace !default;
+
+$font-size-root:   17px;
+$line-height-base: 1.65;
+$headings-font-weight: 600;
+$headings-line-height: 1.25;
+
+// ---------------------------------------------------------------------------
+// Palette
+// Muted petrol/teal: reads as clinical rather than corporate, and stays legible
+// against the greys used for tables and code.
+// ---------------------------------------------------------------------------
+$primary:   #146b76;
+$secondary: #5b6b73;
+$success:   #3f7d58;
+$info:      #3d7c95;
+$warning:   #b07d34;
+$danger:    #a4453c;
+
+$body-color: #1f2933;
+$body-bg:    #ffffff;
+
+$link-color:        $primary;
+$link-hover-color:  darken($primary, 12%);
+$link-decoration:   none;
+$link-hover-decoration: underline;
+
+// Code
+$code-color: #0f5f6a;
+$code-bg:    #f4f8f9;
+$code-block-bg: #f8fafb;
+
+// Structure
+$border-color: #e3e8ea;
+$table-border-color: #e3e8ea;
+$border-radius: 4px;
+
+// Quarto-specific
+$toc-color: $secondary;
+$toc-font-size: 0.85rem;
+
+
+/*-- scss:rules --*/
+
+// ---------------------------------------------------------------------------
+// Reading measure
+// page-layout: full gives the width needed for wide tables and figures, but
+// unconstrained prose is hard to read. Constrain body text, let block elements
+// use the full column.
+// ---------------------------------------------------------------------------
+main p,
+main ul,
+main ol,
+main blockquote {
+  max-width: 78ch;
+}
+
+// ---------------------------------------------------------------------------
+// Headings
+// ---------------------------------------------------------------------------
+h1, .h1 {
+  font-size: 1.85rem;
+  letter-spacing: -0.01em;
+  padding-bottom: 0.35rem;
+  border-bottom: 2px solid rgba(20, 107, 118, 0.18);
+  margin-top: 2.75rem;
+  margin-bottom: 1.1rem;
+}
+
+h2, .h2 {
+  font-size: 1.35rem;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  color: #16323a;
+}
+
+h3, .h3 {
+  font-size: 1.12rem;
+  margin-top: 1.5rem;
+  color: #24424b;
+}
+
+// Section numbers in a lighter weight so the text carries the emphasis
+.header-section-number {
+  color: rgba(20, 107, 118, 0.7);
+  font-weight: 500;
+  margin-right: 0.4rem;
+}
+
+// ---------------------------------------------------------------------------
+// Title block
+// ---------------------------------------------------------------------------
+.quarto-title-block .quarto-title .title {
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+.quarto-title-meta {
+  color: $secondary;
+  font-size: 0.85rem;
+  border-top: 1px solid $border-color;
+  padding-top: 0.6rem;
+  margin-top: 0.9rem;
+}
+
+// ---------------------------------------------------------------------------
+// Tables
+// This report is table-heavy, so these get the most attention: no vertical
+// rules, a strong header underline, right-aligned numerics, subtle zebra.
+// ---------------------------------------------------------------------------
+table,
+.table {
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  border-collapse: collapse;
+  margin: 1.1rem auto 1.4rem auto;
+  width: auto;
+  max-width: 100%;
+}
+
+table thead th,
+.table thead th {
+  border-top: none;
+  border-bottom: 2px solid rgba(20, 107, 118, 0.45);
+  background: transparent;
+  font-weight: 600;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: #16323a;
+  padding: 0.45rem 0.7rem;
+  white-space: nowrap;
+}
+
+table tbody td,
+.table tbody td {
+  border-top: 1px solid #eef2f3;
+  padding: 0.4rem 0.7rem;
+}
+
+table tbody tr:nth-child(even),
+.table tbody tr:nth-child(even) {
+  background-color: #fafcfc;
+}
+
+table tbody tr:hover,
+.table tbody tr:hover {
+  background-color: #f1f7f8;
+}
+
+// Centre every cell. The !important is required because pandoc writes inline
+// text-align styles onto pipe-table cells from the `---:` / `:---:` syntax,
+// and inline styles otherwise win.
+table th,
+table td,
+.table th,
+.table td {
+  text-align: center !important;
+  vertical-align: middle;
+}
+
+// Table captions
+caption,
+.table caption {
+  caption-side: top;
+  font-size: 0.82rem;
+  color: $secondary;
+  padding-bottom: 0.45rem;
+  text-align: center;
+}
+
+// df-print: paged tables
+.cell-output-display .pagedtable {
+  font-size: 0.86rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.cell-output-display .pagedtable td,
+.cell-output-display .pagedtable th {
+  text-align: center !important;
+}
+
+// ---------------------------------------------------------------------------
+// Code
+// ---------------------------------------------------------------------------
+div.sourceCode {
+  background-color: $code-block-bg;
+  border: 1px solid $border-color;
+  border-left: 3px solid rgba(20, 107, 118, 0.55);
+  border-radius: $border-radius;
+  margin: 1rem 0;
+}
+
+pre.sourceCode code {
+  font-size: 0.83rem;
+  line-height: 1.55;
+  padding: 0.15rem 0;
+}
+
+code:not(.sourceCode) {
+  background-color: $code-bg;
+  padding: 0.12em 0.35em;
+  border-radius: 3px;
+  font-size: 0.87em;
+}
+
+// Console output distinguished from source
+.cell-output pre {
+  background-color: #fbfcfc;
+  border: 1px solid #eef2f3;
+  border-radius: $border-radius;
+  font-size: 0.82rem;
+  padding: 0.7rem 0.9rem;
+}
+
+// ---------------------------------------------------------------------------
+// Figures — centred, including plots emitted from code cells
+// ---------------------------------------------------------------------------
+figure {
+  margin: 1.6rem auto;
+  text-align: center;
+}
+
+figure > img,
+figure > p > img,
+.quarto-figure img {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 100%;
+  height: auto;
+}
+
+// Plot output from knitr cells
+.cell-output-display {
+  text-align: center;
+}
+
+.cell-output-display > img,
+.cell-output-display > p > img,
+.cell-output-display > figure > img {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+figcaption,
+.figure-caption {
+  font-size: 0.83rem;
+  color: $secondary;
+  line-height: 1.5;
+  padding-top: 0.5rem;
+  max-width: 78ch;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+// ---------------------------------------------------------------------------
+// Sidebar and TOC
+// ---------------------------------------------------------------------------
+.sidebar-navigation .sidebar-item-container .sidebar-item-text {
+  font-size: 0.9rem;
+}
+
+.sidebar nav[role="doc-toc"] > h2,
+.sidebar nav[role="doc-toc"] > .h2 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: $secondary;
+  font-weight: 600;
+  border-bottom: 1px solid $border-color;
+  padding-bottom: 0.4rem;
+}
+
+nav[role="doc-toc"] ul > li > a.active,
+nav[role="doc-toc"] ul > li > a:hover {
+  color: $primary;
+  border-left: 2px solid $primary;
+  padding-left: 0.5rem;
+}
+
+// ---------------------------------------------------------------------------
+// Navbar
+// ---------------------------------------------------------------------------
+.navbar {
+  border-bottom: 1px solid $border-color;
+  box-shadow: 0 1px 3px rgba(15, 40, 45, 0.05);
+}
+
+.navbar-brand {
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+// ---------------------------------------------------------------------------
+// Blockquotes and callouts
+// ---------------------------------------------------------------------------
+blockquote {
+  border-left: 3px solid rgba(20, 107, 118, 0.35);
+  background: #f7fafb;
+  padding: 0.7rem 1.1rem;
+  color: #2b3a41;
+  font-size: 0.95rem;
+  margin: 1.2rem 0;
+}
+
+.callout {
+  border-radius: $border-radius;
+  font-size: 0.94rem;
+}
+
+// ---------------------------------------------------------------------------
+// Math — keep display equations from crowding surrounding prose
+// ---------------------------------------------------------------------------
+.math.display {
+  margin: 1.1rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+// ---------------------------------------------------------------------------
+// Footer
+// ---------------------------------------------------------------------------
+.nav-footer {
+  font-size: 0.82rem;
+  color: $secondary;
+  border-top: 1px solid $border-color;
+}
+
+// ---------------------------------------------------------------------------
+// Print
+// ---------------------------------------------------------------------------
+@media print {
+  .sidebar, .navbar, .nav-footer, .quarto-title-meta { display: none !important; }
+  main p, main ul, main ol { max-width: none; }
+  div.sourceCode { border-left-width: 2px; }
+}

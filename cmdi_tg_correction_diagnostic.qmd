@@ -1,0 +1,792 @@
+---
+title: "Reconstructing the Composite Metabolic Desirability Index after a triglyceride data correction"
+subtitle: "Diagnostics for the index construction prior to refitting the prediction model"
+date: now
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+#| label: environment
+#| eval: true
+load("/Users/macbookpro/Desktop/Rprojects/codiet3/.RData")                                           
+```
+```{r}
+#| label: setup
+#| eval: true
+
+library(tidyverse)
+library(patchwork)
+# library(readxl)
+library(Hmisc)
+library(desirability2)
+library(knitr)
+```
+
+# Purpose and scope
+
+Triglyceride values were found to be inaccurate for a substantial share of
+observations in the biochemical panel. Because triglycerides are one of the four
+components from which the Composite Metabolic Desirability Index (CMDI) is built,
+the correction propagates into the outcome of the clinical prediction model
+rather than into a single predictor.
+
+The prediction model is fitted with `bootPriorProc`, which takes approximately
+6.2 hours to run. Repeating that run under several candidate constructions would
+be costly, so the purpose of this document is to settle the index construction
+first, using diagnostics that are less time consuming.
+
+Three constructions are compared:
+
+| Label | Triglycerides | Desirability bounds |
+|---|---|---|
+| **v1** | original | data-driven (`use_data = TRUE`) |
+| **v2** | corrected | data-driven (`use_data = TRUE`) |
+| **v3** | corrected | fixed clinical bounds (`use_data = FALSE`) |
+
+The three pairwise comparisons separate the two sources of change: v1 → v2
+isolates the data correction, v2 → v3 isolates the parameterisation, and v1 → v3
+gives the total that downstream reporting would have to absorb.
+
+The prediction model is an ordinal regression one, which is
+rank-based and invariant to monotone transformations of the outcome. Changes in
+the *scale* or *spread* of the CMDI therefore have no effect on the fitted model;
+only changes in the *ordering* of participants do. Rank correlation is used
+throughout as the primary measure of impact for this reason.
+
+# Data preparation and the three index constructions
+
+## Corrected triglycerides and imputation
+
+```{r}
+#| label: load-tg
+
+tg_corrected <- readxl::read_xlsx(
+  "/Users/macbookpro/Desktop/Rprojects/codiet2/dat/latest2_triglycerides_change/WP2 CODIET BIOCHEMICAL_HEMATOLOGICAL_INDICES FINAL JULY CHECK  31.7.26.xlsx",
+  sheet = "biochem_310726")
+
+tg_corrected <- tg_corrected |>
+  separate(ID, c("x", "ID", "t"), sep = "_") |>
+  select(-x, -t) |>
+  select(-Site_Collection)
+
+biochem_TGcorr <- biochem |>
+  select(-TRIG) |>
+  inner_join(tg_corrected, by = c("ID", "Timepoint")) |>
+  relocate(TRIG, .before = HDL)
+```
+
+Missing values are imputed with the same random-forest procedure used for the
+original analysis (`miceRanger`), and the multiply-imputed datasets are collapsed
+by taking the mean for numeric variables and the mode for character variables.
+
+```{r}
+#| label: impute
+
+# mR2_biochem_TGcorr is produced by running for_jobs.R
+
+fMode      <- function(x) names(which.max(table(x)))
+fsummarise <- function(x) if (is.character(x)) fMode(x) else round(mean(x), 2)
+
+imp_dataList <- miceRanger::completeData(mR2_biochem_TGcorr)
+imp_dataList <- map(imp_dataList, \(x) x |> rownames_to_column(var = "id")) |>
+  list_rbind()
+
+d_imp <- imp_dataList[, lapply(.SD, fsummarise), by = id]
+biochem_TGcorr_imp <- d_imp |> select(-id) |> as_tibble()
+rm(d_imp, imp_dataList, fsummarise, fMode)
+
+bp_rf_input <- human_dat_imp |>
+  filter(Timepoint %in% c(1, 3)) |>
+  unite("ID_Timepoint", ID, Timepoint) |>
+  select(ID_Timepoint, bmi) |>
+  inner_join(
+    biochem_TGcorr_imp |> unite("ID_Timepoint", ID, Timepoint) |>
+      select(ID_Timepoint, TRIG, HDL, GLU),
+    by = "ID_Timepoint") |>
+  relocate(bmi, .before = TRIG) |>
+  separate(ID_Timepoint, into = c("ID", "Timepoint"))
+```
+
+## Scale of the triglyceride change
+
+The correction is not marginal. Median triglycerides rise by half and the upper
+tail extends considerably further.
+
+| Statistic | Original | Corrected |
+|---|---:|---:|
+| n | 299 | 296 |
+| Mean | 84.6 | 123.7 |
+| Median | 70.0 | 105.0 |
+| Gini mean difference | 57.5 | 79.7 |
+| 25th percentile | 46.8 | 70.9 |
+| 75th percentile | 107.0 | 141.7 |
+| 95th percentile | 180.2 | 235.0 |
+| Maximum | 590.1 | 1351.6 |
+
+The difference in row counts reflects three records with missing BMI, which the
+desirability functions exclude in either case; the analysis set is unaffected.
+
+## v2: corrected triglycerides, data-driven bounds
+
+This is the construction as originally specified, with the triglyceride `scale`
+re-tuned so that the IDF threshold of 150 mg/dL continues to map to a desirability
+of 0.6 under the new data range.
+
+```{r}
+#| label: build-v2
+
+bp_rf_output_reducedIndex_TGcorr <- bp_rf_input |> mutate(
+  d_BMI  = d_max(bmi,  scale = 0.5015, use_data = TRUE),   # target 30 >
+  d_TRIG = d_max(TRIG, scale = 0.2095, use_data = TRUE),   # target 150 >= (re-tuned)
+  d_HDL  = d_min(HDL,  scale = 2.08,   use_data = TRUE),   # target 45 <
+  d_GLU  = d_max(GLU,  scale = 0.8135, use_data = TRUE),   # target 100 >=
+  ms_score = round(100 * d_overall(across(starts_with("d_"))), digits = 4)
+)
+```
+
+## v3: corrected triglycerides, fixed clinical bounds
+
+The bounds are stated explicitly and the `scale` for each component is solved so
+that the clinical anchor is preserved exactly. Solving rather than hard-coding
+means a change to any bound cannot silently break the anchoring.
+
+```{r}
+#| label: bounds
+
+BOUNDS <- tibble::tribble(
+  ~comp,  ~kind,  ~low,  ~high, ~anchor, ~target,
+  "BMI",  "max",  14,    70,     30,     0.5,
+  "TRIG", "max",  15,    1000,   150,    0.5,
+  "HDL",  "min",  10,    130,    45,     0.5,
+  "GLU",  "max",  40,    500,    100,    0.5
+)
+
+scale_for <- function(anchor, low, high, target, kind) {
+  frac <- if (kind == "max") (anchor - low) / (high - low)
+          else               (high - anchor) / (high - low)
+  stopifnot(frac > 0, frac < 1)
+  log(target) / log(frac)
+}
+
+BOUNDS <- BOUNDS |>
+  rowwise() |>
+  mutate(scale = scale_for(anchor, low, high, target, kind)) |>
+  ungroup()
+
+getb <- function(cp, f) BOUNDS[[f]][BOUNDS$comp == cp]
+BOUNDS
+```
+
+| Component | Kind | low | high | anchor | target | scale |
+|---|---|---:|---:|---:|---:|---:|
+| BMI | `d_max` | 14 | 70 | 30 | 0.5 | 0.553 |
+| TRIG | `d_max` | 15 | 1000 | 150 | 0.5 | 0.349 |
+| HDL | `d_min` | 10 | 130 | 45 | 0.5 | 2.010 |
+| GLU | `d_max` | 40 | 500 | 100 | 0.5 | 0.340 |
+
+A small floor is applied to each component before aggregation. Under a geometric
+mean a single component at zero forces the whole index to zero, so the floor
+prevents one extreme value from erasing the information in the other three. With
+the bounds above no observation reaches the floor, so it acts as insurance rather
+than doing real work.
+
+```{r}
+#| label: build-v3
+
+EPS <- 0.01
+
+bp_rf_output_reducedIndex_fixed <- bp_rf_input |>
+  mutate(
+    d_BMI  = d_max(bmi,  low = getb("BMI","low"),  high = getb("BMI","high"),
+                   scale = getb("BMI","scale"),  use_data = FALSE),
+    d_TRIG = d_max(TRIG, low = getb("TRIG","low"), high = getb("TRIG","high"),
+                   scale = getb("TRIG","scale"), use_data = FALSE),
+    d_HDL  = d_min(HDL,  low = getb("HDL","low"),  high = getb("HDL","high"),
+                   scale = getb("HDL","scale"),  use_data = FALSE),
+    d_GLU  = d_max(GLU,  low = getb("GLU","low"),  high = getb("GLU","high"),
+                   scale = getb("GLU","scale"),  use_data = FALSE)
+  ) |>
+  mutate(n_zero_raw = rowSums(across(starts_with("d_"), ~ .x <= 0), na.rm = TRUE)) |>
+  mutate(across(starts_with("d_"), ~ pmax(.x, EPS))) |>
+  mutate(ms_score = round(100 * d_overall(across(starts_with("d_"))), digits = 4))
+```
+
+# Why the bounds were changed
+
+The move from data-driven to fixed bounds was not part of the original plan. It
+was prompted by two observations that emerged while diagnosing the correction.
+
+## Scores that depend on other participants
+
+With `use_data = TRUE` the desirability bounds are taken from the observed range,
+so the participant holding the sample minimum receives a desirability of exactly
+zero on that component. Because the index is a geometric mean, that zero
+propagates to the whole index.
+
+The clearest example is ID 132 at timepoint 3. Their triglyceride value is 35
+mg/dL in both the original and corrected datasets, it did not change. Their CMDI
+nonetheless fell from 43.5 to 0, because the sample minimum moved from 15.47 up
+to 35, making them the new floor-holder.
+
+| ID | Timepoint | TRIG (v1) | TRIG (v2) | CMDI v1 | CMDI v2 |
+|---|---|---:|---:|---:|---:|
+| 132 | 3 | 35.0 | 35.0 | 43.5 | 0.0 |
+| 207 | 1 | 15.5 | 35.4 | 0.0 | 19.6 |
+
+An index in which one participant's score changes because a different
+participant's data changed is difficult to defend as an individual-level
+quantity, and it is incompatible with applying the index to an external cohort.
+
+## A clinically implausible score
+
+ID 132 at timepoint 3 has BMI 31.1, HDL 50, glucose 96 and triglycerides 35. A
+CMDI of zero places this participant at the most metabolically desirable end of
+the scale, which is not a reasonable description of someone in the obese BMI
+range. The zero is an artefact of the floor mechanism rather than a summary of
+their metabolic state.
+
+## Selecting the bounds
+
+Three criteria were used, in order:
+
+1. Clinical defensibility: Bounds anchored to published thresholds and chosen
+   a priori rather than from the observed data.
+2. Coverage: Wide enough that saturation is rare, verified empirically. This
+   matters because a saturated value carries no information: every observation
+   beyond a bound receives an identical desirability.
+3. Portability: Fixed, so that the index can be computed identically in an
+   external cohort.
+
+The bounds were widened iteratively. An initial set (BMI 16–55, TG 20–500, HDL
+20–110, glucose 55–250) produced 23 observations at the floor, driven by HDL ≥ 80
+and glucose ≤ 70 — both common values rather than clinical extremes. The final
+set places each bound beyond the plausible clinical range: severe underweight
+through super-obesity for BMI, values below any plausible fasting measurement
+through the threshold for pancreatitis risk for triglycerides, severe
+hypoalphalipoproteinaemia through exceptional hyperalphalipoproteinaemia for HDL,
+and clinical hypoglycaemia through marked hyperglycaemia for glucose.
+
+## Saturation audit
+
+```{r}
+#| label: saturation
+
+bp_rf_output_reducedIndex_fixed |>
+  summarise(
+    BMI_lo  = sum(bmi  <= getb("BMI","low")),   BMI_hi  = sum(bmi  >= getb("BMI","high")),
+    TRIG_lo = sum(TRIG <= getb("TRIG","low")),  TRIG_hi = sum(TRIG >= getb("TRIG","high")),
+    HDL_lo  = sum(HDL  <= getb("HDL","low")),   HDL_hi  = sum(HDL  >= getb("HDL","high")),
+    GLU_lo  = sum(GLU  <= getb("GLU","low")),   GLU_hi  = sum(GLU  >= getb("GLU","high"))
+  ) |>
+  kable(caption = "Observations reaching each bound")
+```
+
+| BMI_lo | BMI_hi | TRIG_lo | TRIG_hi | HDL_lo | HDL_hi | GLU_lo | GLU_hi |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
+
+No observation reaches a lower bound, so the zero-collapse mechanism cannot
+operate. One observation sit at or above the triglyceride ceiling of 1000
+mg/dL. This is acceptable: values in that range fall into a clinically homogeneous
+category in which management does not differentiate further, so collapsing them
+is a reasonable simplification rather than a loss.
+
+# The anchor value
+
+Each component's `target` states the desirability assigned to a participant
+sitting exactly at the IDF threshold. The original specification used 0.5 where
+the IDF states a criterion with a strict inequality and 0.6 where it uses a
+non-strict inequality, on the reasoning that a participant at the threshold has
+already met the criterion in the latter case.
+
+The direction of that adjustment follows from the definition, but the magnitude
+does not. The distinction between `>150` and `≥150` concerns a single point on a
+continuous scale, and encoding it as a 0.1 shift in desirability, which
+propagates to a 36% change in the scale parameter, gives it more weight than it
+can carry. Two of the four anchors are also not clean IDF thresholds: the HDL
+anchor of 45 mg/dL is a sex-neutral compromise between the 40 mg/dL and 50 mg/dL
+criteria, and BMI > 30 is the IDF's surrogate provision for when waist
+circumference is unavailable rather than the primary criterion.
+
+A single anchor is used for all four components instead. The justification is
+that the IDF assigns equal status to each criterion (each contributes one
+qualifying condition, none counts for more than another) so mapping all four
+thresholds to the same desirability preserves that equivalence.
+
+## The specific value does not matter
+
+With a uniform target $c$ across components, the scale for component $i$ is
+$s_i = \log c / \log f_{a,i}$ where $f_{a,i}$ is the anchor's fractional position
+within the bounds. Then
+
+$$\log d_i = s_i \log f_i = \log c \cdot \frac{\log f_i}{\log f_{a,i}}$$
+
+and the log of the aggregated index is
+
+$$\log \text{CMDI} = \frac{1}{4}\sum_i \log d_i = \log c \cdot K, \qquad
+K = \frac{1}{4}\sum_i \frac{\log f_i}{\log f_{a,i}}$$
+
+$K$ does not involve $c$, so $\text{CMDI} = c^{K}$ is a strictly monotone function
+of the same underlying quantity for any $c \in (0,1)$. Participant ordering is
+therefore identical for every uniform anchor, and because all component
+influences scale by $|\log c|$ together, the relative weighting is unchanged as
+well.
+
+```{r}
+#| label: anchor-invariance
+#| eval: true
+
+cmdi_with_target <- function(dat, BOUNDS, c_target) {
+  B <- BOUNDS |> mutate(target = c_target) |>
+    rowwise() |> mutate(scale = scale_for(anchor, low, high, target, kind)) |> ungroup()
+  gb <- function(cp, f) B[[f]][B$comp == cp]
+  dat |>
+    transmute(
+      d_BMI  = d_max(bmi,  low = gb("BMI","low"),  high = gb("BMI","high"),
+                     scale = gb("BMI","scale"),  use_data = FALSE),
+      d_TRIG = d_max(TRIG, low = gb("TRIG","low"), high = gb("TRIG","high"),
+                     scale = gb("TRIG","scale"), use_data = FALSE),
+      d_HDL  = d_min(HDL,  low = gb("HDL","low"),  high = gb("HDL","high"),
+                     scale = gb("HDL","scale"),  use_data = FALSE),
+      d_GLU  = d_max(GLU,  low = gb("GLU","low"),  high = gb("GLU","high"),
+                     scale = gb("GLU","scale"),  use_data = FALSE)
+    ) |>
+    mutate(across(everything(), ~ pmax(.x, EPS))) |>
+    transmute(ms = 100 * d_overall(across(starts_with("d_")))) |>
+    pull(ms)
+}
+
+anchor_check <- tibble(c_target = c(0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8)) |>
+  mutate(
+    idx      = map(c_target, ~ cmdi_with_target(bp_rf_input, BOUNDS, .x)),
+    median   = map_dbl(idx, median),
+    min      = map_dbl(idx, min),
+    max      = map_dbl(idx, max),
+    spearman = map_dbl(idx, ~ cor(.x, cmdi_with_target(bp_rf_input, BOUNDS, 0.5),
+                                  method = "spearman"))
+  ) |>
+  select(-idx)
+
+anchor_check |> kable(digits = c(1, 2, 2, 2, 6))
+```
+
+The rank correlation against the reference is exactly 1 for every value tested,
+confirming that the choice is a labelling decision. A value of 0.5 is used as the
+midpoint of the scale, and the `Methods` section of the paper can state plainly that 
+the specific value is inconsequential.
+
+# Assembling the comparison
+
+```{r}
+#| label: assemble
+#| eval: true
+
+key_int <- function(d) d |> mutate(across(c(ID, Timepoint), as.integer))
+
+pull_v <- function(d, tag)
+  key_int(d) |>
+  select(ID, Timepoint, starts_with("d_"), ms_score) |>
+  rename_with(~ paste0(.x, "_", tag), c(starts_with("d_"), "ms_score"))
+
+cmp <- temp_dat |>
+  key_int() |>
+  select(ID, Timepoint) |>
+  left_join(pull_v(bp_rf_output_reducedIndex,        "v1"), by = c("ID","Timepoint")) |>
+  left_join(pull_v(bp_rf_output_reducedIndex_TGcorr, "v2"), by = c("ID","Timepoint")) |>
+  left_join(pull_v(bp_rf_output_reducedIndex_fixed,  "v3"), by = c("ID","Timepoint")) |>
+  filter(!is.na(ms_score_v1), !is.na(ms_score_v2), !is.na(ms_score_v3))
+
+n_tot <- nrow(cmp)
+
+CUT <- c(v1 = 44.29,
+         v2 = median(cmp$ms_score_v2),
+         v3 = median(cmp$ms_score_v3))
+
+cmp <- cmp |>
+  mutate(
+    str_v1 = ifelse(ms_score_v1 >= CUT["v1"], "high", "low"),
+    str_v2 = ifelse(ms_score_v2 >= CUT["v2"], "high", "low"),
+    str_v3 = ifelse(ms_score_v3 >= CUT["v3"], "high", "low")
+  )
+```
+
+The high-risk cut-point is the median of each index. Because the cut is defined
+this way, each version splits the cohort in half by construction, so changes in
+stratum membership reflect rank movement rather than a shift in the overall
+distribution.
+
+# Distribution of the three indices
+
+```{r}
+#| label: distribution-table
+#| eval: true
+
+gmd <- function(x) Hmisc::GiniMd(x[!is.na(x)])
+
+summ <- tibble(
+  version = c("v1 original", "v2 TG-corrected", "v3 TG-corr + fixed bounds"),
+  cut     = as.numeric(CUT),
+  median  = c(median(cmp$ms_score_v1), median(cmp$ms_score_v2), median(cmp$ms_score_v3)),
+  mean    = c(mean(cmp$ms_score_v1),   mean(cmp$ms_score_v2),   mean(cmp$ms_score_v3)),
+  gmd     = c(gmd(cmp$ms_score_v1),    gmd(cmp$ms_score_v2),    gmd(cmp$ms_score_v3)),
+  min     = c(min(cmp$ms_score_v1),    min(cmp$ms_score_v2),    min(cmp$ms_score_v3)),
+  max     = c(max(cmp$ms_score_v1),    max(cmp$ms_score_v2),    max(cmp$ms_score_v3)),
+  n_zero  = c(sum(cmp$ms_score_v1 == 0), sum(cmp$ms_score_v2 == 0),
+              sum(cmp$ms_score_v3 == 0))
+)
+
+summ |> kable(digits = 2)
+```
+
+Descriptive statistics for the final construction over the full set of 296
+scored observations:
+
+| Statistic | Value |
+|---|---:|
+| n | 296 |
+| Distinct values | 296 |
+| Mean | 45.68 |
+| Median | 45.98 |
+| Gini mean difference | 6.99 |
+| 5th percentile | 34.48 |
+| 25th percentile | 41.54 |
+| 75th percentile | 50.25 |
+| 95th percentile | 54.34 |
+| Minimum | 27.99 |
+| Maximum | 66.97 |
+
+Two features are worth commenting on.
+
+The index is more compressed than under data-driven bounds, with 90% of
+participants between roughly 34 and 54. This is expected: the bounds now
+represent clinically extreme values, and a score near 90 would require a
+participant to sit near the pathological extreme of all four components at once.
+Under a geometric mean, four moderate desirabilities produce a moderate
+composite. Since `ordinal regression` is invariant to monotone transformation, the compression
+has no effect on the model.
+
+The maximum is also lower than under data-driven bounds. This is arguably more
+honest: `use_data = TRUE` places the worst participant near the top of the scale
+by construction, which gives a misleading impression that the cohort spans the
+full range of metabolic risk. Fixed anchors make it visible that it does not,
+which is consistent with the limitation already noted in the manuscript.
+
+```{r}
+#| label: fig-distributions
+#| fig-cap: "CMDI distributions under the three constructions, with the published cut-point and the re-derived cut-point marked."
+#| fig-width: 6
+#| fig-height: 7
+#| eval: true
+
+theme_set(ggstatsplot::theme_ggstatsplot()) 
+
+long3 <- cmp |>
+  select(ms_score_v1, ms_score_v2, ms_score_v3) |>
+  pivot_longer(everything(), names_to = "version", values_to = "cmdi") |>
+  mutate(version = recode(version,
+                          ms_score_v1 = "v1 original",
+                          ms_score_v2 = "v2 TG-corrected",
+                          ms_score_v3 = "v3 TG-corr + fixed bounds"))
+
+p_dens <- ggplot(long3, aes(cmdi, colour = version, fill = version)) +
+  geom_density(alpha = 0.22) +
+  geom_vline(xintercept = CUT["v1"], linetype = 3, colour = "firebrick") +
+  geom_vline(xintercept = CUT["v3"], linetype = 2, colour = "darkgreen") +
+  labs(x = "CMDI", y = "Density", colour = NULL, fill = NULL) +
+  theme(legend.position = "bottom")
+
+p_hist <- ggplot(cmp, aes(ms_score_v3)) +
+  geom_histogram(bins = 30, fill = scales::alpha("grey35", 0.4)) +
+  geom_vline(xintercept = CUT["v3"], linetype = 2, colour = "darkgreen") +
+  labs(x = "CMDI (v3)", y = "Count")
+
+p_dens / p_hist + plot_annotation(tag_levels = "A")
+```
+
+The histogram of the adopted construction is unimodal with a slightly longer
+lower tail and no pile-up at either boundary. Apparent shoulders in the kernel
+density estimate do not persist across bin widths and are attributable to
+smoothing rather than structure.
+
+# Zero-collapse audit
+
+```{r}
+#| label: zero-audit
+
+zero_count <- function(tag) {
+  dd <- cmp |> select(starts_with("d_") & ends_with(tag))
+  sum(rowSums(dd <= 0, na.rm = TRUE) > 0)
+}
+
+tibble(
+  version = c("v1 original", "v2 TG-corrected", "v3 fixed bounds (after floor)",
+              "v3 before floor"),
+  n_with_zero_component = c(zero_count("_v1"), zero_count("_v2"), zero_count("_v3"),
+                            sum(bp_rf_output_reducedIndex_fixed$n_zero_raw > 0,
+                                na.rm = TRUE))
+) |> kable()
+```
+
+| Version | Observations with a zero component |
+|---|---:|
+| v1 original | 4 |
+| v2 TG-corrected | 4 |
+| v3 fixed bounds | 0 |
+| v3 before the floor | 0 |
+
+The four observations that collapsed to zero under data-driven bounds receive
+plausible scores under fixed bounds:
+
+```{r}
+#| label: floor-cases
+#| eval: true
+
+cmp |>
+  filter(ms_score_v1 == 0 | ms_score_v2 == 0 | ms_score_v3 == 0 |
+           ID %in% c(207, 132)) |>
+  select(ID, Timepoint, ms_score_v1, ms_score_v2, ms_score_v3) |>
+  kable(digits = 2)
+```
+
+# Rank stability
+
+```{r}
+#| label: rank-stability
+#| eval: true
+
+pair_stats <- function(a, b, lab) {
+  tibble(comparison = lab,
+         spearman   = cor(a, b, method = "spearman"),
+         kendall    = cor(a, b, method = "kendall"),
+         pearson    = cor(a, b, method = "pearson"),
+         med_abs_rank_shift = median(abs(rank(b) - rank(a))),
+         pct_moving_gt10pct = 100 * mean(abs(rank(b) - rank(a)) > 0.10 * length(a)))
+}
+
+rk <- bind_rows(
+  pair_stats(cmp$ms_score_v1, cmp$ms_score_v2, "v1 -> v2  (data correction)"),
+  pair_stats(cmp$ms_score_v2, cmp$ms_score_v3, "v2 -> v3  (parameterisation)"),
+  pair_stats(cmp$ms_score_v1, cmp$ms_score_v3, "v1 -> v3  (total)")
+)
+
+rk |> kable(digits = 4)
+```
+
+```{r}
+#| label: fig-scatter
+#| fig-cap: "Participant-level comparison of the three constructions."
+#| fig-width: 11
+#| fig-height: 5
+#| eval: true
+
+theme_set(ggstatsplot::theme_ggstatsplot())
+
+p_v1v2 <- ggplot(cmp, aes(ms_score_v1, ms_score_v2)) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2, colour = "grey50") +
+  geom_point(alpha = 0.65, size = 1.7, colour = "grey30") +
+  labs(x = "CMDI v1 (published)", y = "CMDI v2 (corrected TG)",
+       subtitle = "Data correction only")
+
+p_v2v3 <- ggplot(cmp, aes(ms_score_v2, ms_score_v3)) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2, colour = "grey50") +
+  geom_point(alpha = 0.65, size = 1.7, colour = "steelblue") +
+  labs(x = "CMDI v2 (data-driven bounds)", y = "CMDI v3 (fixed bounds)",
+       subtitle = "Parameterisation only")
+
+p_v1v3 <- cmp |>
+  mutate(changed = str_v1 != str_v3) |>
+  ggplot(aes(ms_score_v1, ms_score_v3)) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2, colour = "grey50") +
+  geom_point(aes(colour = changed), alpha = 0.75, size = 1.8) +
+  scale_colour_manual(values = c(`FALSE` = "grey55", `TRUE` = "firebrick"),
+                      name = "Changes stratum") +
+  labs(x = "CMDI v1 (published)", y = "CMDI v3 (adopted)",
+       subtitle = "Total change") +
+  theme(legend.position = "bottom")
+
+p_v1v2 | p_v2v3 | p_v1v3
+```
+
+Ordering is well preserved across all three comparisons, which is the quantity
+that determines whether the refitted model will resemble the published one. The
+correction and the reparameterisation each contribute a comparable amount of
+movement, and neither dominates.
+
+# Stratum changes
+
+```{r}
+#| label: stratum
+#| eval: true
+
+stratum_tab <- function(a, b, lab) {
+  tibble(comparison = lab,
+         n_changed  = sum(a != b),
+         pct        = 100 * mean(a != b))
+}
+
+bind_rows(
+  stratum_tab(cmp$str_v1, cmp$str_v2, "v1 -> v2"),
+  stratum_tab(cmp$str_v2, cmp$str_v3, "v2 -> v3"),
+  stratum_tab(cmp$str_v1, cmp$str_v3, "v1 -> v3")
+) |> kable(digits = 1)
+
+table(from = cmp$str_v1, to = cmp$str_v3) |> kable(caption = "v1 -> v3")
+```
+
+Observations closest to the cut-point are those most likely to move again on
+refitting, and are listed below for reference.
+
+```{r}
+#| label: near-cut
+#| eval: true
+
+cmp |>
+  mutate(dist = abs(ms_score_v3 - CUT["v3"])) |>
+  arrange(dist) |>
+  select(ID, Timepoint, ms_score_v1, ms_score_v3, dist) |>
+  head(10) |>
+  kable(digits = 3)
+```
+
+# Component structure and relative influence
+
+## Correlations between components
+
+```{r}
+#| label: component-cor
+#| eval: true
+
+bp_rf_output_reducedIndex_fixed |>
+  select(starts_with("d_")) |>
+  cor(method = "spearman") |>
+  round(3) |>
+  kable(caption = "Spearman correlations between component desirabilities")
+```
+
+The components are only weakly associated. The strongest relationship, between
+triglycerides and HDL, is consistent with atherogenic dyslipidaemia. Glucose is
+close to independent of both lipid components, which is less expected given that
+insulin resistance would predict some association along the same axis.
+
+Two implications can be noted. First, it explains why the index is sensitive to how
+the components are weighted: with near-orthogonal components there is little
+shared variance to stabilise the aggregate. Second, it is worth noting that the
+CMDI is a multi-response desirability aggregation rather than a latent-variable
+measurement model. The Derringer–Suich framework makes no assumption that the
+components load on a common factor; it aggregates desirability, which is a
+statement about what is clinically preferable rather than a claim about
+dimensionality. This distinguishes the approach from factor-analytic severity
+scores, which do assume a single underlying factor.
+
+## Relative influence of each component
+
+Under a geometric mean, each component's contribution to variation in the
+composite is governed by the spread of its log-desirability. Since
+$\log d_i = s_i \log f_i$, influence is proportional to the scale parameter.
+
+```{r}
+#| label: influence
+
+influence <- bp_rf_output_reducedIndex_fixed |>
+  select(starts_with("d_")) |>
+  summarise(across(everything(), ~ sd(log(pmax(.x, 1e-6))))) |>
+  pivot_longer(everything(), names_to = "component", values_to = "log_sd") |>
+  mutate(share = log_sd / sum(log_sd))
+
+influence |> kable(digits = 3)
+```
+
+| Component | Share of composite variation |
+|---|---:|
+| BMI | 18.8% |
+| TRIG | 25.6% |
+| HDL | 46.7% |
+| GLU | 8.9% |
+
+The contributions are uneven, with HDL carrying close to half the variation and
+glucose under a tenth. This is a consequence of where each anchor falls within
+its bounds rather than a deliberate weighting: HDL is the only component whose
+anchor sits in the upper part of its range, which produces a convex transform
+that expands differences, while the other three have concave transforms that
+compress them. For a `d_min` component, widening the upper bound pushes the
+anchor fraction toward 1 and inflates the scale parameter sharply, so the
+widening adopted for portability necessarily increased HDL's influence.
+
+This is reported as a property of the construction rather than corrected, for
+reasons set out in the next section.
+
+# Alternatives considered
+
+Several alternative parameterisations were tested and set aside. Each is recorded
+here because the reasons for rejection are part of the justification for the
+adopted construction.
+
+| Alternative | Rank correlation with adopted | Reason for rejection |
+|---|---:|---|
+| Data-driven bounds (`use_data = TRUE`) | — | Scores depend on other participants' data; four observations collapse to zero |
+| Mixed anchors (0.5 / 0.6 by inequality type) | 0.989 | Direction defensible, magnitude disproportionate to a single-point distinction |
+| Targets solved to equalise contributions | 0.911 | Derived from the sample's own variances, and the IDF thresholds map to desirabilities spanning 0.24–0.76 with no clinical meaning |
+| Linear transform (`target` = anchor fraction) | — | Abandons the anchoring entirely; triglycerides then dominate at roughly 47% |
+| Narrow symmetric bounds | 0.982 | 43 observations (14.5%) saturate at the HDL ceiling, reintroducing the zero-collapse problem |
+
+Note on two of these:
+
+**Equalising the component contributions** is achievable by solving for the
+target that gives each component the required scale. It was rejected on two
+grounds. The solution depends on the spread of each component in this particular
+sample, so it reintroduces the sample-dependence that motivated the move away
+from data-driven bounds, simply relocated from the bounds to the targets. It also
+empties the target of clinical meaning: a participant at the glucose threshold
+would be scored as less metabolically undesirable than one at the HDL threshold,
+by a factor of three, with no rationale. There is also a tension with the
+argument made in the manuscript's introduction, which criticises binary
+definitions for treating criteria as equivalent despite heterogeneous risk
+implications; equal weighting by construction does the same thing.
+
+**Narrow symmetric bounds** are attractive because bounds symmetric about the
+anchor give a scale of exactly 1, producing a linear transform with the threshold
+at the midpoint. The rank correlation with the adopted construction was 0.982,
+which initially looked acceptable. The saturation audit showed why it was not:
+43 observations sat at or above an HDL ceiling of 70 mg/dL, a value that is
+common rather than extreme. The high rank correlation persisted because the
+clamping is directionally correct — high HDL is protective and those
+participants belong at the low-risk end — but their HDL information is lost.
+This is a useful reminder that rank correlation alone does not detect degraded
+measurement.
+
+# Summary and remaining checks
+
+The adopted construction uses corrected triglycerides, fixed clinical bounds, a
+uniform anchor of 0.5, and a small floor applied before aggregation. On the
+evidence assembled here:
+
+- No component can reach zero, so the geometric-mean collapse that produced
+  implausible scores under data-driven bounds cannot occur.
+- Saturation is limited to one observation at the triglyceride ceiling, in a
+  range where clinical management does not differentiate.
+- Participant ordering is well preserved relative to the published index, so the
+  refitted model is expected to resemble the published one in structure, with
+  movement concentrated among predictors near the selection threshold.
+- The index no longer depends on which participants happen to be in the sample,
+  which is a prerequisite for the external validation described in the
+  manuscript.
+- Component contributions are uneven and this is disclosed rather than adjusted,
+  since every attempt to balance them cost more in interpretability or
+  portability than it gained.
+
+A check before refitting:
+
+The near-zero correlation between glucose and the lipid components is not what
+insulin-resistance pathophysiology would predict, particularly since the
+triglyceride–HDL association is present. Given that an error has already been
+found in this panel, it is worth confirming that fasting status was standardised
+and recorded, and that glucose was assayed from the same draw as the lipids.
+Inconsistent fasting would decorrelate glucose while leaving the lipid
+relationships intact, which matches the observed pattern.
+
+```{r}
+#| label: session
+
+sessionInfo()
+```

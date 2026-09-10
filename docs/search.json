@@ -1,0 +1,160 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Metabolite Biomarkers and Clinical Prediction for Metabolic Syndrome",
+    "section": "",
+    "text": "This site documents the analytical work behind a study of metabolic syndrome in a population-based cohort. The work has two connected parts.\nThe first is a Composite Metabolic Desirability Index (CMDI): a continuous measure of metabolic risk built from body mass index, triglycerides, HDL cholesterol and fasting glucose using multi-response optimisation and desirability functions. The motivation is that the conventional International Diabetes Federation definition reduces a graded biological phenomenon to a yes/no classification, which discards information at the thresholds and treats all qualifying criteria as interchangeable.\nThe second is a clinical prediction model for that index, fitted with a bespoke priority-ordered variable selection procedure (bootPriorProc) across a set of data domains spanning demographics, dietary indices, physical activity, medication, device-based body composition, clinical biochemistry, targeted metabolomics, urinary metabolites and untargeted lipidomics."
+  },
+  {
+    "objectID": "index.html#index-reconstruction",
+    "href": "index.html#index-reconstruction",
+    "title": "Metabolite Biomarkers and Clinical Prediction for Metabolic Syndrome",
+    "section": "Index reconstruction",
+    "text": "Index reconstruction\nReconstructing the CMDI after a triglyceride data correction\nA data-quality problem was identified in the triglyceride measurements after the initial analysis was complete. Because triglycerides are one of the four components of the CMDI, the correction propagates into the model outcome rather than into a single predictor.\nThis section documents the diagnostics used to decide how the index should be constructed before committing to a refit. It compares the original index, the index with corrected triglycerides, and a version with fixed clinical bounds; examines the consequences of deriving desirability bounds from the observed data range; and records the alternative parameterisations that were tested and set aside."
+  },
+  {
+    "objectID": "cmdi_tg_correction_diagnostic.html",
+    "href": "cmdi_tg_correction_diagnostic.html",
+    "title": "Reconstructing the Composite Metabolic Desirability Index after a triglyceride data correction",
+    "section": "",
+    "text": "Triglyceride values were found to be inaccurate for a substantial share of observations in the biochemical panel. Because triglycerides are one of the four components from which the Composite Metabolic Desirability Index (CMDI) is built, the correction propagates into the outcome of the clinical prediction model rather than into a single predictor.\nThe prediction model is fitted with bootPriorProc, which takes approximately 6.2 hours to run. Repeating that run under several candidate constructions would be costly, so the purpose of this document is to settle the index construction first, using diagnostics that are less time consuming.\nThree constructions are compared:\n\n\n\nLabel\nTriglycerides\nDesirability bounds\n\n\n\n\nv1\noriginal\ndata-driven (use_data = TRUE)\n\n\nv2\ncorrected\ndata-driven (use_data = TRUE)\n\n\nv3\ncorrected\nfixed clinical bounds (use_data = FALSE)\n\n\n\nThe three pairwise comparisons separate the two sources of change: v1 → v2 isolates the data correction, v2 → v3 isolates the parameterisation, and v1 → v3 gives the total that downstream reporting would have to absorb.\nThe prediction model is an ordinal regression one, which is rank-based and invariant to monotone transformations of the outcome. Changes in the scale or spread of the CMDI therefore have no effect on the fitted model; only changes in the ordering of participants do. Rank correlation is used throughout as the primary measure of impact for this reason.",
+    "crumbs": [
+      "Metabolite Biomarkers & Clinical Prediction For Metabolic Syndrome",
+      "Sections",
+      "Index Reconstruction"
+    ]
+  },
+  {
+    "objectID": "cmdi_tg_correction_diagnostic.html#corrected-triglycerides-and-imputation",
+    "href": "cmdi_tg_correction_diagnostic.html#corrected-triglycerides-and-imputation",
+    "title": "Reconstructing the Composite Metabolic Desirability Index after a triglyceride data correction",
+    "section": "Corrected triglycerides and imputation",
+    "text": "Corrected triglycerides and imputation\nMissing values are imputed with the same random-forest procedure used for the original analysis (miceRanger), and the multiply-imputed datasets are collapsed by taking the mean for numeric variables and the mode for character variables.",
+    "crumbs": [
+      "Metabolite Biomarkers & Clinical Prediction For Metabolic Syndrome",
+      "Sections",
+      "Index Reconstruction"
+    ]
+  },
+  {
+    "objectID": "cmdi_tg_correction_diagnostic.html#scale-of-the-triglyceride-change",
+    "href": "cmdi_tg_correction_diagnostic.html#scale-of-the-triglyceride-change",
+    "title": "Reconstructing the Composite Metabolic Desirability Index after a triglyceride data correction",
+    "section": "Scale of the triglyceride change",
+    "text": "Scale of the triglyceride change\nThe correction is not marginal. Median triglycerides rise by half and the upper tail extends considerably further.\n\n\n\nStatistic\nOriginal\nCorrected\n\n\n\n\nn\n299\n296\n\n\nMean\n84.6\n123.7\n\n\nMedian\n70.0\n105.0\n\n\nGini mean difference\n57.5\n79.7\n\n\n25th percentile\n46.8\n70.9\n\n\n75th percentile\n107.0\n141.7\n\n\n95th percentile\n180.2\n235.0\n\n\nMaximum\n590.1\n1351.6\n\n\n\nThe difference in row counts reflects three records with missing BMI, which the desirability functions exclude in either case; the analysis set is unaffected.",
+    "crumbs": [
+      "Metabolite Biomarkers & Clinical Prediction For Metabolic Syndrome",
+      "Sections",
+      "Index Reconstruction"
+    ]
+  },
+  {
+    "objectID": "cmdi_tg_correction_diagnostic.html#v2-corrected-triglycerides-data-driven-bounds",
+    "href": "cmdi_tg_correction_diagnostic.html#v2-corrected-triglycerides-data-driven-bounds",
+    "title": "Reconstructing the Composite Metabolic Desirability Index after a triglyceride data correction",
+    "section": "v2: corrected triglycerides, data-driven bounds",
+    "text": "v2: corrected triglycerides, data-driven bounds\nThis is the construction as originally specified, with the triglyceride scale re-tuned so that the IDF threshold of 150 mg/dL continues to map to a desirability of 0.6 under the new data range.",
+    "crumbs": [
+      "Metabolite Biomarkers & Clinical Prediction For Metabolic Syndrome",
+      "Sections",
+      "Index Reconstruction"
+    ]
+  },
+  {
+    "objectID": "cmdi_tg_correction_diagnostic.html#v3-corrected-triglycerides-fixed-clinical-bounds",
+    "href": "cmdi_tg_correction_diagnostic.html#v3-corrected-triglycerides-fixed-clinical-bounds",
+    "title": "Reconstructing the Composite Metabolic Desirability Index after a triglyceride data correction",
+    "section": "v3: corrected triglycerides, fixed clinical bounds",
+    "text": "v3: corrected triglycerides, fixed clinical bounds\nThe bounds are stated explicitly and the scale for each component is solved so that the clinical anchor is preserved exactly. Solving rather than hard-coding means a change to any bound cannot silently break the anchoring.\n\n\n\nComponent\nKind\nlow\nhigh\nanchor\ntarget\nscale\n\n\n\n\nBMI\nd_max\n14\n70\n30\n0.5\n0.553\n\n\nTRIG\nd_max\n15\n1000\n150\n0.5\n0.349\n\n\nHDL\nd_min\n10\n130\n45\n0.5\n2.010\n\n\nGLU\nd_max\n40\n500\n100\n0.5\n0.340\n\n\n\nA small floor is applied to each component before aggregation. Under a geometric mean a single component at zero forces the whole index to zero, so the floor prevents one extreme value from erasing the information in the other three. With the bounds above no observation reaches the floor, so it acts as insurance rather than doing real work.",
+    "crumbs": [
+      "Metabolite Biomarkers & Clinical Prediction For Metabolic Syndrome",
+      "Sections",
+      "Index Reconstruction"
+    ]
+  },
+  {
+    "objectID": "cmdi_tg_correction_diagnostic.html#scores-that-depend-on-other-participants",
+    "href": "cmdi_tg_correction_diagnostic.html#scores-that-depend-on-other-participants",
+    "title": "Reconstructing the Composite Metabolic Desirability Index after a triglyceride data correction",
+    "section": "Scores that depend on other participants",
+    "text": "Scores that depend on other participants\nWith use_data = TRUE the desirability bounds are taken from the observed range, so the participant holding the sample minimum receives a desirability of exactly zero on that component. Because the index is a geometric mean, that zero propagates to the whole index.\nThe clearest example is ID 132 at timepoint 3. Their triglyceride value is 35 mg/dL in both the original and corrected datasets, it did not change. Their CMDI nonetheless fell from 43.5 to 0, because the sample minimum moved from 15.47 up to 35, making them the new floor-holder.\n\n\n\nID\nTimepoint\nTRIG (v1)\nTRIG (v2)\nCMDI v1\nCMDI v2\n\n\n\n\n132\n3\n35.0\n35.0\n43.5\n0.0\n\n\n207\n1\n15.5\n35.4\n0.0\n19.6\n\n\n\nAn index in which one participant’s score changes because a different participant’s data changed is difficult to defend as an individual-level quantity, and it is incompatible with applying the index to an external cohort.",
+    "crumbs": [
+      "Metabolite Biomarkers & Clinical Prediction For Metabolic Syndrome",
+      "Sections",
+      "Index Reconstruction"
+    ]
+  },
+  {
+    "objectID": "cmdi_tg_correction_diagnostic.html#a-clinically-implausible-score",
+    "href": "cmdi_tg_correction_diagnostic.html#a-clinically-implausible-score",
+    "title": "Reconstructing the Composite Metabolic Desirability Index after a triglyceride data correction",
+    "section": "A clinically implausible score",
+    "text": "A clinically implausible score\nID 132 at timepoint 3 has BMI 31.1, HDL 50, glucose 96 and triglycerides 35. A CMDI of zero places this participant at the most metabolically desirable end of the scale, which is not a reasonable description of someone in the obese BMI range. The zero is an artefact of the floor mechanism rather than a summary of their metabolic state.",
+    "crumbs": [
+      "Metabolite Biomarkers & Clinical Prediction For Metabolic Syndrome",
+      "Sections",
+      "Index Reconstruction"
+    ]
+  },
+  {
+    "objectID": "cmdi_tg_correction_diagnostic.html#selecting-the-bounds",
+    "href": "cmdi_tg_correction_diagnostic.html#selecting-the-bounds",
+    "title": "Reconstructing the Composite Metabolic Desirability Index after a triglyceride data correction",
+    "section": "Selecting the bounds",
+    "text": "Selecting the bounds\nThree criteria were used, in order:\n\nClinical defensibility: Bounds anchored to published thresholds and chosen a priori rather than from the observed data.\nCoverage: Wide enough that saturation is rare, verified empirically. This matters because a saturated value carries no information: every observation beyond a bound receives an identical desirability.\nPortability: Fixed, so that the index can be computed identically in an external cohort.\n\nThe bounds were widened iteratively. An initial set (BMI 16–55, TG 20–500, HDL 20–110, glucose 55–250) produced 23 observations at the floor, driven by HDL ≥ 80 and glucose ≤ 70 — both common values rather than clinical extremes. The final set places each bound beyond the plausible clinical range: severe underweight through super-obesity for BMI, values below any plausible fasting measurement through the threshold for pancreatitis risk for triglycerides, severe hypoalphalipoproteinaemia through exceptional hyperalphalipoproteinaemia for HDL, and clinical hypoglycaemia through marked hyperglycaemia for glucose.",
+    "crumbs": [
+      "Metabolite Biomarkers & Clinical Prediction For Metabolic Syndrome",
+      "Sections",
+      "Index Reconstruction"
+    ]
+  },
+  {
+    "objectID": "cmdi_tg_correction_diagnostic.html#saturation-audit",
+    "href": "cmdi_tg_correction_diagnostic.html#saturation-audit",
+    "title": "Reconstructing the Composite Metabolic Desirability Index after a triglyceride data correction",
+    "section": "Saturation audit",
+    "text": "Saturation audit\n\n\n\n\n\n\n\n\n\n\n\n\n\nBMI_lo\nBMI_hi\nTRIG_lo\nTRIG_hi\nHDL_lo\nHDL_hi\nGLU_lo\nGLU_hi\n\n\n\n\n0\n0\n0\n1\n0\n0\n0\n0\n\n\n\nNo observation reaches a lower bound, so the zero-collapse mechanism cannot operate. One observation sit at or above the triglyceride ceiling of 1000 mg/dL. This is acceptable: values in that range fall into a clinically homogeneous category in which management does not differentiate further, so collapsing them is a reasonable simplification rather than a loss.",
+    "crumbs": [
+      "Metabolite Biomarkers & Clinical Prediction For Metabolic Syndrome",
+      "Sections",
+      "Index Reconstruction"
+    ]
+  },
+  {
+    "objectID": "cmdi_tg_correction_diagnostic.html#the-specific-value-does-not-matter",
+    "href": "cmdi_tg_correction_diagnostic.html#the-specific-value-does-not-matter",
+    "title": "Reconstructing the Composite Metabolic Desirability Index after a triglyceride data correction",
+    "section": "The specific value does not matter",
+    "text": "The specific value does not matter\nWith a uniform target \\(c\\) across components, the scale for component \\(i\\) is \\(s_i = \\log c / \\log f_{a,i}\\) where \\(f_{a,i}\\) is the anchor’s fractional position within the bounds. Then\n\\[\\log d_i = s_i \\log f_i = \\log c \\cdot \\frac{\\log f_i}{\\log f_{a,i}}\\]\nand the log of the aggregated index is\n\\[\\log \\text{CMDI} = \\frac{1}{4}\\sum_i \\log d_i = \\log c \\cdot K, \\qquad\nK = \\frac{1}{4}\\sum_i \\frac{\\log f_i}{\\log f_{a,i}}\\]\n\\(K\\) does not involve \\(c\\), so \\(\\text{CMDI} = c^{K}\\) is a strictly monotone function of the same underlying quantity for any \\(c \\in (0,1)\\). Participant ordering is therefore identical for every uniform anchor, and because all component influences scale by \\(|\\log c|\\) together, the relative weighting is unchanged as well.\n\n\n\n\n\nc_target\nmedian\nmin\nmax\nspearman\n\n\n\n\n0.2\n16.47\n6.49\n39.42\n0.999972\n\n\n0.3\n25.94\n10.95\n49.84\n1.000000\n\n\n0.4\n35.81\n18.58\n58.86\n1.000000\n\n\n0.5\n45.98\n27.99\n66.97\n1.000000\n\n\n0.6\n56.41\n39.13\n74.42\n1.000000\n\n\n0.7\n67.05\n51.94\n81.36\n1.000000\n\n\n0.8\n77.87\n66.37\n87.89\n1.000000\n\n\n\n\n\nThe rank correlation against the reference is exactly 1 for every value tested, confirming that the choice is a labelling decision. A value of 0.5 is used as the midpoint of the scale, and the Methods section of the paper can state plainly that the specific value is inconsequential.",
+    "crumbs": [
+      "Metabolite Biomarkers & Clinical Prediction For Metabolic Syndrome",
+      "Sections",
+      "Index Reconstruction"
+    ]
+  },
+  {
+    "objectID": "cmdi_tg_correction_diagnostic.html#correlations-between-components",
+    "href": "cmdi_tg_correction_diagnostic.html#correlations-between-components",
+    "title": "Reconstructing the Composite Metabolic Desirability Index after a triglyceride data correction",
+    "section": "Correlations between components",
+    "text": "Correlations between components\n\n\n\nSpearman correlations between component desirabilities\n\n\n\nd_BMI\nd_TRIG\nd_HDL\nd_GLU\n\n\n\n\nd_BMI\n1.000\n0.198\n0.149\n0.118\n\n\nd_TRIG\n0.198\n1.000\n0.327\n-0.045\n\n\nd_HDL\n0.149\n0.327\n1.000\n-0.004\n\n\nd_GLU\n0.118\n-0.045\n-0.004\n1.000\n\n\n\n\n\nThe components are only weakly associated. The strongest relationship, between triglycerides and HDL, is consistent with atherogenic dyslipidaemia. Glucose is close to independent of both lipid components, which is less expected given that insulin resistance would predict some association along the same axis.\nTwo implications can be noted. First, it explains why the index is sensitive to how the components are weighted: with near-orthogonal components there is little shared variance to stabilise the aggregate. Second, it is worth noting that the CMDI is a multi-response desirability aggregation rather than a latent-variable measurement model. The Derringer–Suich framework makes no assumption that the components load on a common factor; it aggregates desirability, which is a statement about what is clinically preferable rather than a claim about dimensionality. This distinguishes the approach from factor-analytic severity scores, which do assume a single underlying factor.",
+    "crumbs": [
+      "Metabolite Biomarkers & Clinical Prediction For Metabolic Syndrome",
+      "Sections",
+      "Index Reconstruction"
+    ]
+  },
+  {
+    "objectID": "cmdi_tg_correction_diagnostic.html#relative-influence-of-each-component",
+    "href": "cmdi_tg_correction_diagnostic.html#relative-influence-of-each-component",
+    "title": "Reconstructing the Composite Metabolic Desirability Index after a triglyceride data correction",
+    "section": "Relative influence of each component",
+    "text": "Relative influence of each component\nUnder a geometric mean, each component’s contribution to variation in the composite is governed by the spread of its log-desirability. Since \\(\\log d_i = s_i \\log f_i\\), influence is proportional to the scale parameter.\n\n\n\nComponent\nShare of composite variation\n\n\n\n\nBMI\n18.8%\n\n\nTRIG\n25.6%\n\n\nHDL\n46.7%\n\n\nGLU\n8.9%\n\n\n\nThe contributions are uneven, with HDL carrying close to half the variation and glucose under a tenth. This is a consequence of where each anchor falls within its bounds rather than a deliberate weighting: HDL is the only component whose anchor sits in the upper part of its range, which produces a convex transform that expands differences, while the other three have concave transforms that compress them. For a d_min component, widening the upper bound pushes the anchor fraction toward 1 and inflates the scale parameter sharply, so the widening adopted for portability necessarily increased HDL’s influence.\nThis is reported as a property of the construction rather than corrected, for reasons set out in the next section.",
+    "crumbs": [
+      "Metabolite Biomarkers & Clinical Prediction For Metabolic Syndrome",
+      "Sections",
+      "Index Reconstruction"
+    ]
+  }
+]
