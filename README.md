@@ -4,11 +4,9 @@ Analysis documentation for a study of metabolic syndrome in a population-based
 cohort, covering the construction of a continuous metabolic risk index and a
 clinical prediction model built on it.
 
-**Rendered site:** https://<username>.github.io/<repository>/
+**Rendered site:** https://arikoi.github.io/codiet3/
 
 ---
-
-## What this repository contains
 
 Two connected pieces of work are documented here.
 
@@ -29,7 +27,10 @@ participant to respect the repeated-measures structure.
 
 The site currently documents the reconstruction of the index following a data
 quality problem found in the triglyceride measurements. Further sections will be
-added as analyses are completed.
+added as analyses are completed. The work continues from and is connected to the 
+previous version of the analysis, documented at 
+https://arikoi.github.io/codiet2/
+which is deprecated. 
 
 ## Data availability
 
